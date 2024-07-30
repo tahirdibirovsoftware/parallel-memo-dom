@@ -1,6 +1,6 @@
 {
   "name": "parallel-memo-dom",
-  "version": "1.0.0",
+  "version": "1.0.7",
   "description": "A browser library for offloading heavy computations to web workers with memoization",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

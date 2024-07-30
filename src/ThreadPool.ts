@@ -11,7 +11,7 @@ export class ThreadPool {
 
     constructor(options: ThreadPoolOptions) {
         this.size = options.size;
-        this.threads = Array.from({ length: this.size }, () => new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' }));
+        this.threads = Array.from({ length: this.size }, () => new Worker(new URL('./worker.js', import.meta.url), { type: 'module' }));
         Thread.configure({ enableCaching: options.enableCaching });
     }
 
