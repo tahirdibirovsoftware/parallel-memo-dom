@@ -1,0 +1,36 @@
+{
+  "name": "parallel-memo-dom",
+  "version": "1.0.0",
+  "description": "A browser library for offloading heavy computations to web workers with memoization",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.3"
+  },
+  "keywords": [
+    "browser",
+    "web workers",
+    "parallel",
+    "computation",
+    "memoization",
+    "dom"
+  ],
+  "author": "Tahir Dibirov",
+  "license": "MIT",
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tahirdibirovsoftware/parallel-memo-dom"
+  },
+  "bugs": {
+    "url": "https://github.com/tahirdibirovsoftware/parallel-memo-dom/issues"
+  },
+  "homepage": "https://github.com/tahirdibirovsoftware/parallel-memo-dom#readme"
+}
