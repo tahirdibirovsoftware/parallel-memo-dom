@@ -110,6 +110,20 @@ Thread.configure({ enableCaching: false });
 })();
 ```
 
+## Vite Configuration
+
+If you are using Vite and encounter issues with the `parallel-memo-dom` dependency, you can exclude it from the dependency optimization process by adding the following configuration to your `vite.config.ts`:
+
+```typescript
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+  optimizeDeps: {
+    exclude: ['parallel-memo-dom']
+  }
+});
+```
+
 ## API
 
 ### `Thread`
@@ -129,4 +143,3 @@ Contributions are welcome! Please open an issue or submit a pull request for any
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
-# parallel-memo-dom
