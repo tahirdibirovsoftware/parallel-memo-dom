@@ -1,0 +1,42 @@
+# Source files
+src/
+
+# Test files
+test/
+*.test.ts
+*.spec.ts
+
+# Configuration files
+tsconfig.json
+tslint.json
+.eslintrc.js
+.prettierrc
+
+# Git files
+.gitignore
+.git/
+
+# CI files
+.travis.yml
+.gitlab-ci.yml
+.github/
+
+# Editor configuration
+.vscode/
+.idea/
+
+# Documentation files
+docs/
+*.md
+!README.md
+
+# Build scripts
+scripts/
+
+# Example files
+examples/
+
+# Miscellaneous
+*.log
+.DS_Store
+Thumbs.db
