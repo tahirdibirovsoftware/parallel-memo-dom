@@ -131,20 +131,6 @@ The library uses an LRU (Least Recently Used) caching mechanism to store results
 
 The library now uses TypeScript generics for better type inference and safety when working with different function signatures.
 
-## Vite Configuration
-
-If you are using Vite and encounter issues with the `parallel-memo-dom` dependency, you can exclude it from the dependency optimization process by adding the following configuration to your `vite.config.ts`:
-
-```typescript
-import { defineConfig } from 'vite';
-
-export default defineConfig({
-  optimizeDeps: {
-    exclude: ['parallel-memo-dom']
-  }
-});
-```
-
 ## Contributing
 
 Contributions are welcome! Please open an issue or submit a pull request for any improvements or bug fixes.
