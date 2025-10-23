@@ -1,4 +1,6 @@
 #!/bin/sh
 . "$(dirname "$0")/_/husky.sh"
+npx --no -- vitest run || exit 1
 
+# If tests pass, run lint-staged to auto-fix/validate staged files
 npx --no -- lint-staged
