@@ -19,7 +19,7 @@ export class ThreadPool {
 
     constructor(options: ThreadPoolOptions) {
         this.size = options.size;
-        this.threads = Array.from({ length: this.size }, () => new Worker(new URL('./worker.js', import.meta.url), { type: 'module' }));
+        this.threads = Array.from({ length: this.size }, () => Thread.createWorker());
         Thread.configure({ enableCaching: options.enableCaching });
         this.resizePool();
     }
@@ -52,14 +52,14 @@ export class ThreadPool {
     private handleWorkerError<T extends any[], R>(error: Error, task: Task<T, R>) {
         console.error('Worker error:', error);
         task.reject(error);
-        const newWorker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
+        const newWorker = Thread.createWorker();
         this.threads.push(newWorker);
     }
 
     private resizePool() {
         const optimalSize = navigator.hardwareConcurrency || 4;
         while (this.threads.length < optimalSize) {
-            const newWorker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
+            const newWorker = Thread.createWorker();
             this.threads.push(newWorker);
         }
     }
