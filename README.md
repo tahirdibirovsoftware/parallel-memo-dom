@@ -26,21 +26,21 @@ npm install parallel-memo-dom
 import { Thread } from 'parallel-memo-dom';
 
 const someHeavyComputation = (a: number, b: number): number => {
-    // Simulate heavy computation
-    let result = 0;
-    for (let i = 0; i < 1000000000; i++) {
-        result += Math.sqrt(a * b);
-    }
-    return result;
+  // Simulate heavy computation
+  let result = 0;
+  for (let i = 0; i < 1000000000; i++) {
+    result += Math.sqrt(a * b);
+  }
+  return result;
 };
 
 (async () => {
-    try {
-        const result = await Thread.exec(someHeavyComputation, 10, 20);
-        console.log('Computation result:', result);
-    } catch (error) {
-        console.error('Error in thread execution:', error);
-    }
+  try {
+    const result = await Thread.exec(someHeavyComputation, 10, 20);
+    console.log('Computation result:', result);
+  } catch (error) {
+    console.error('Error in thread execution:', error);
+  }
 })();
 ```
 
@@ -52,21 +52,21 @@ import { ThreadPool } from 'parallel-memo-dom';
 const pool = new ThreadPool({ size: 4 });
 
 const someHeavyComputation = (a: number, b: number): number => {
-    // Simulate heavy computation
-    let result = 0;
-    for (let i = 0; i < 1000000000; i++) {
-        result += Math.sqrt(a * b);
-    }
-    return result;
+  // Simulate heavy computation
+  let result = 0;
+  for (let i = 0; i < 1000000000; i++) {
+    result += Math.sqrt(a * b);
+  }
+  return result;
 };
 
 (async () => {
-    try {
-        const result = await pool.exec(someHeavyComputation, 10, 20);
-        console.log('Computation result:', result);
-    } catch (error) {
-        console.error('Error in thread execution:', error);
-    }
+  try {
+    const result = await pool.exec(someHeavyComputation, 10, 20);
+    console.log('Computation result:', result);
+  } catch (error) {
+    console.error('Error in thread execution:', error);
+  }
 })();
 ```
 
@@ -87,21 +87,21 @@ Thread.configure({ enableCaching: false });
 import { Thread } from 'parallel-memo-dom';
 
 const processBigData = (data: ArrayBuffer): ArrayBuffer => {
-    // Process the data
-    const result = new ArrayBuffer(data.byteLength);
-    new Uint8Array(result).set(new Uint8Array(data));
-    return result;
+  // Process the data
+  const result = new ArrayBuffer(data.byteLength);
+  new Uint8Array(result).set(new Uint8Array(data));
+  return result;
 };
 
 const bigData = new ArrayBuffer(1000000);
 
 (async () => {
-    try {
-        const result = await Thread.exec(processBigData, bigData);
-        console.log('Processed data size:', result.byteLength);
-    } catch (error) {
-        console.error('Error in thread execution:', error);
-    }
+  try {
+    const result = await Thread.exec(processBigData, bigData);
+    console.log('Processed data size:', result.byteLength);
+  } catch (error) {
+    console.error('Error in thread execution:', error);
+  }
 })();
 ```
 
