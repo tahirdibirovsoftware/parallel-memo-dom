@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Thread } from '../src/Thread';
 
@@ -6,7 +7,6 @@ describe('Thread.exec', () => {
 
   beforeEach(() => {
     origCreate = (Thread as any).createWorker;
-    // disable caching by default in tests to avoid cross-test pollution
     Thread.configure({ enableCaching: false });
   });
 
@@ -15,26 +15,36 @@ describe('Thread.exec', () => {
     Thread.configure({ enableCaching: true });
   });
 
-  it('sends transferables when ArrayBuffer arg provided', async () => {
+  it('sends transferables when ArrayBuffer argument is provided', async () => {
     const buf = new ArrayBuffer(8);
     let captured: any = null;
 
     class MockWorker {
       onmessage: ((ev: any) => void) | null = null;
       onerror: ((ev: any) => void) | null = null;
-      postMessage(msg: any, transferables?: any) {
+
+      postMessage(msg: any, transferables?: Transferable[]) {
         captured = { msg, transferables };
-        // simulate worker processing and respond
-        setTimeout(() => {
-          if (this.onmessage) this.onmessage({ data: 'ok' });
+        setTimeout(async () => {
+          try {
+            const fn = new Function('return ' + msg.fn)();
+            const result = await fn(...msg.args); // supports async functions
+            this.onmessage && this.onmessage({ data: result });
+          } catch (err) {
+            this.onmessage &&
+              this.onmessage({
+                data: { __parallelMemoDomError: true, message: (err as Error).message },
+              });
+          }
         }, 0);
       }
+
       terminate() {}
     }
 
     (Thread as any).createWorker = () => new MockWorker();
 
-    const result = await Thread.exec((bufArg: ArrayBuffer) => 'ok', buf as any);
+    const result = await Thread.exec(async (bufArg: ArrayBuffer) => 'ok', buf as any);
 
     expect(result).toBe('ok');
     expect(captured).not.toBeNull();
@@ -42,18 +52,26 @@ describe('Thread.exec', () => {
     expect(captured.transferables[0]).toBe(buf);
   });
 
-  it('caches results when caching enabled', async () => {
+  it('caches results when caching is enabled', async () => {
     Thread.configure({ enableCaching: true });
-    let workerCreates = 0;
+    let workerCalls = 0;
 
     class MockWorker {
       onmessage: ((ev: any) => void) | null = null;
       postMessage(msg: any) {
-        workerCreates++;
-        // evaluate function string similarly to the real worker
-        const fn = new Function('return ' + msg.fn)();
-        const res = fn(...msg.args);
-        setTimeout(() => this.onmessage && this.onmessage({ data: res }), 0);
+        workerCalls++;
+        setTimeout(async () => {
+          try {
+            const fn = new Function('return ' + msg.fn)();
+            const result = await fn(...msg.args);
+            this.onmessage && this.onmessage({ data: result });
+          } catch (err) {
+            this.onmessage &&
+              this.onmessage({
+                data: { __parallelMemoDomError: true, message: (err as Error).message },
+              });
+          }
+        }, 0);
       }
       terminate() {}
     }
@@ -66,7 +84,6 @@ describe('Thread.exec', () => {
 
     expect(r1).toBe(2);
     expect(r2).toBe(2);
-    // ensure worker used only once due to caching
-    expect(workerCreates).toBe(1);
+    expect(workerCalls).toBe(1); // cached, only one worker call
   });
 });

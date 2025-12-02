@@ -1,33 +1,35 @@
 import { Thread } from './Thread';
 
 interface ThreadPoolOptions {
-  size: number;
+  size?: number; // Optional; defaults to hardwareConcurrency
   enableCaching?: boolean;
 }
 
 type Task<T extends any[], R> = {
-  fn: (...args: T) => R;
+  fn: (...args: T) => R | Promise<R>;
   args: T;
   resolve: (value: R | PromiseLike<R>) => void;
   reject: (reason?: any) => void;
 };
 
 export class ThreadPool {
-  private size: number;
-  private threads: Worker[];
+  private threads: Worker[] = [];
   private taskQueue: Task<any[], any>[] = [];
+  private maxSize: number;
 
   constructor(options: ThreadPoolOptions) {
-    this.size = options.size;
-    this.threads = Array.from({ length: this.size }, () => Thread.createWorker());
+    this.maxSize = options.size ?? navigator.hardwareConcurrency ?? 4;
     Thread.configure({ enableCaching: options.enableCaching });
-    this.resizePool();
+
+    // Pre-create workers
+    for (let i = 0; i < this.maxSize; i++) {
+      this.threads.push(Thread.createWorker());
+    }
   }
 
-  async exec<T extends any[], R>(fn: (...args: T) => R, ...args: T): Promise<R> {
-    return new Promise((resolve, reject) => {
+  async exec<T extends any[], R>(fn: (...args: T) => R | Promise<R>, ...args: T): Promise<R> {
+    return new Promise<R>((resolve, reject) => {
       const task: Task<T, R> = { fn, args, resolve, reject };
-
       if (this.threads.length > 0) {
         this.executeTask(task);
       } else {
@@ -37,30 +39,29 @@ export class ThreadPool {
   }
 
   private executeTask<T extends any[], R>(task: Task<T, R>) {
-    const thread = this.threads.pop()!;
+    const worker = this.threads.pop()!;
+
     Thread.exec(task.fn, ...task.args)
       .then(task.resolve)
-      .catch((error) => this.handleWorkerError(error, task))
+      .catch((err) => this.handleWorkerError(err, task))
       .finally(() => {
-        this.threads.push(thread);
+        // Re-add worker to pool
+        this.threads.push(worker);
+
+        // Execute next task in queue if available
         if (this.taskQueue.length > 0) {
-          this.executeTask(this.taskQueue.shift()!);
+          const nextTask = this.taskQueue.shift()!;
+          this.executeTask(nextTask);
         }
       });
   }
 
   private handleWorkerError<T extends any[], R>(error: Error, task: Task<T, R>) {
-    console.error('Worker error:', error);
+    console.error('ThreadPool worker error:', error);
     task.reject(error);
+
+    // Replace failed worker with a new one
     const newWorker = Thread.createWorker();
     this.threads.push(newWorker);
-  }
-
-  private resizePool() {
-    const optimalSize = navigator.hardwareConcurrency || 4;
-    while (this.threads.length < optimalSize) {
-      const newWorker = Thread.createWorker();
-      this.threads.push(newWorker);
-    }
   }
 }

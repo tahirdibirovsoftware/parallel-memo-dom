@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/ban-types */
 class LRUCache<K, V> {
   private cache: Map<K, V> = new Map();
   private readonly maxSize: number;
@@ -7,12 +8,13 @@ class LRUCache<K, V> {
   }
 
   get(key: K): V | undefined {
-    const item = this.cache.get(key);
-    if (item) {
+    const value = this.cache.get(key);
+    if (value !== undefined) {
+      // Move key to end to mark as recently used
       this.cache.delete(key);
-      this.cache.set(key, item);
+      this.cache.set(key, value);
     }
-    return item;
+    return value;
   }
 
   set(key: K, value: V): void {
@@ -35,39 +37,49 @@ export class Thread {
   private static enableCaching: boolean = true;
   private static workerBlobUrl: string | null = null;
 
-  static configure(options: ThreadOptions): void {
+  static configure(options: ThreadOptions) {
     Thread.enableCaching = options.enableCaching ?? true;
   }
 
-  static exec<T extends any[], R>(fn: (...args: T) => R, ...args: T): Promise<R> {
+  static exec<T extends any[], R>(fn: (...args: T) => R | Promise<R>, ...args: T): Promise<R> {
     return new Promise((resolve, reject) => {
+      // Check cache first
+      const cacheKey = Thread.getCacheKey(fn, args);
       if (Thread.enableCaching) {
-        const cacheKey = Thread.getCacheKey(fn, args);
-        const cachedResult = Thread.cache.get(cacheKey);
-        if (cachedResult !== undefined) {
-          resolve(cachedResult);
+        const cached = Thread.cache.get(cacheKey);
+        if (cached !== undefined) {
+          resolve(cached);
           return;
         }
       }
 
       const worker = Thread.createWorker();
 
-      const transferables = args.filter(
+      // Collect transferable objects
+      const transferables: Transferable[] = args.filter(
         (arg) => arg instanceof ArrayBuffer || arg instanceof MessagePort,
       );
-      worker.postMessage({ fn: fn.toString(), args }, transferables);
 
       worker.onmessage = (event) => {
-        const result = event.data;
-        if (Thread.enableCaching) {
-          const cacheKey = Thread.getCacheKey(fn, args);
-          Thread.cache.set(cacheKey, result);
+        const data = event.data;
+        if (data?.__parallelMemoDomError) {
+          reject(new Error(data.message));
+        } else {
+          if (Thread.enableCaching) {
+            Thread.cache.set(cacheKey, data);
+          }
+          resolve(data);
         }
-        resolve(result);
         worker.terminate();
       };
 
-      worker.onerror = reject;
+      worker.onerror = (err) => {
+        reject(err);
+        worker.terminate();
+      };
+
+      // Send function and args to worker
+      worker.postMessage({ fn: fn.toString(), args }, transferables);
     });
   }
 
@@ -80,37 +92,33 @@ export class Thread {
     });
   }
 
-  // Create an inline worker from the worker logic so bundlers like Vite don't need a separate file.
-  // Reuses a single Blob URL across workers to avoid leaking object URLs.
   static createWorker(): Worker {
     if (!Thread.workerBlobUrl) {
-      // Worker code mirrors the previous `worker.ts` behavior.
-      const workerCode = `self.onmessage = (event) => {
-    const { fn, args } = event.data;
+      const workerCode = `
+self.onmessage = async (event) => {
+  const { fn, args } = event.data;
+  try {
     const func = new Function('return ' + fn)();
-    try {
-        const result = func(...args);
-        const transferables = result instanceof ArrayBuffer ? [result] : undefined;
-        // When using postMessage from a worker, the second parameter is an array of transferables.
-        // Using the structured clone algorithm when transferables is undefined.
-        if (transferables) {
-            self.postMessage(result, transferables);
-        } else {
-            self.postMessage(result);
-        }
-    } catch (err) {
-        // Post error message back; the main thread will reject the promise via onerror/onmessage handling.
-        // As Error objects are not always cloneable across contexts, send a plain object.
-        self.postMessage({ __parallelMemoDomError: true, message: err && err.message, stack: err && err.stack });
+    const result = await func(...args); // support async side-effects like fetch
+    const transferables = result instanceof ArrayBuffer ? [result] : undefined;
+    if (transferables) {
+      self.postMessage(result, transferables);
+    } else {
+      self.postMessage(result);
     }
-};`;
-
+  } catch (err) {
+    self.postMessage({
+      __parallelMemoDomError: true,
+      message: err?.message || 'Unknown error',
+      stack: err?.stack
+    });
+  }
+};
+      `;
       const blob = new Blob([workerCode], { type: 'application/javascript' });
       Thread.workerBlobUrl = URL.createObjectURL(blob);
     }
 
-    // Create a module-type worker where supported; inline workers can't be created as 'module' reliably across
-    // browsers when using Blob URLs, so we create a classic worker. The worker code doesn't rely on modules.
-    return new Worker(Thread.workerBlobUrl!);
+    return new Worker(Thread.workerBlobUrl);
   }
 }
