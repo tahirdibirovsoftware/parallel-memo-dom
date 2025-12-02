@@ -1,16 +1,20 @@
 # Parallel-Memo-DOM
 
-Parallel-Memo-DOM is a powerful browser library for offloading heavy computations to web workers, enabling parallel execution and improving application performance. It includes advanced features such as memoization, dynamic thread pool management, and improved type safety.
+**Parallel-Memo-DOM** is a lightweight browser library for offloading CPU-intensive or async computations to **Web Workers**, enabling parallel execution and keeping the main thread responsive. It also provides **optional caching** and a **thread pool** for efficient worker management.
+
+---
 
 ## Features
 
-- Parallel execution of functions using Web Workers
-- Thread pool management for efficient resource utilization
-- LRU (Least Recently Used) caching mechanism for improved performance
-- Support for transferable objects for efficient data transfer
-- Dynamic thread pool sizing based on available hardware
-- Improved type safety with TypeScript generics
-- Error handling and recovery for worker failures
+- Execute any function in a **Web Worker**, including async operations like `fetch`.
+- **ThreadPool** for managing multiple workers and queuing tasks.
+- Optional **LRU caching** of function results to avoid redundant work.
+- Support for **transferable objects** (`ArrayBuffer`, `MessagePort`) for efficient data transfer.
+- **Dynamic thread pool sizing** based on hardware concurrency.
+- Fully typed with **TypeScript generics**.
+- Robust **error handling**: worker failures are caught and replaced automatically.
+
+---
 
 ## Installation
 
@@ -18,123 +22,117 @@ Parallel-Memo-DOM is a powerful browser library for offloading heavy computation
 npm install parallel-memo-dom
 ```
 
+---
+
 ## Usage
 
-### Basic Usage with Thread
+### Using `Thread` for single function execution
 
-```typescript
+```ts
 import { Thread } from 'parallel-memo-dom';
 
-const someHeavyComputation = (a: number, b: number): number => {
-  // Simulate heavy computation
-  let result = 0;
-  for (let i = 0; i < 1000000000; i++) {
-    result += Math.sqrt(a * b);
-  }
-  return result;
+const fetchAndFilter = async (url: string) => {
+  const res = await fetch(url);
+  const data = await res.json();
+  return data.filter((item: any) => item.completed); // heavy filtering in worker
 };
 
-(async () => {
-  try {
-    const result = await Thread.exec(someHeavyComputation, 10, 20);
-    console.log('Computation result:', result);
-  } catch (error) {
-    console.error('Error in thread execution:', error);
-  }
-})();
+Thread.exec(fetchAndFilter, 'https://jsonplaceholder.typicode.com/todos')
+  .then((result) => console.log('Filtered data:', result))
+  .catch((err) => console.error('Thread error:', err));
 ```
 
-### Using Thread Pool
+> Note: The network request, JSON parsing, and filtering happen inside the worker thread.
 
-```typescript
+---
+
+### Using `ThreadPool` for multiple concurrent tasks
+
+```ts
 import { ThreadPool } from 'parallel-memo-dom';
 
 const pool = new ThreadPool({ size: 4 });
 
-const someHeavyComputation = (a: number, b: number): number => {
-  // Simulate heavy computation
-  let result = 0;
-  for (let i = 0; i < 1000000000; i++) {
-    result += Math.sqrt(a * b);
-  }
-  return result;
+const heavyComputation = (a: number, b: number) => {
+  let sum = 0;
+  for (let i = 0; i < 1e7; i++) sum += Math.sqrt(a * b);
+  return sum;
 };
 
-(async () => {
-  try {
-    const result = await pool.exec(someHeavyComputation, 10, 20);
-    console.log('Computation result:', result);
-  } catch (error) {
-    console.error('Error in thread execution:', error);
-  }
-})();
+Promise.all([pool.exec(heavyComputation, 10, 20), pool.exec(heavyComputation, 5, 15)]).then(
+  (results) => console.log('Results:', results),
+);
 ```
 
-### Configuring Caching
+---
 
-```typescript
+### Configuring caching
+
+```ts
 import { Thread } from 'parallel-memo-dom';
 
-// Disable caching if needed
-Thread.configure({ enableCaching: false });
-
-// Rest of the code remains the same
+// Enable or disable caching globally
+Thread.configure({ enableCaching: true });
 ```
 
-### Using with Transferable Objects
+---
 
-```typescript
+### Using transferable objects
+
+```ts
 import { Thread } from 'parallel-memo-dom';
 
-const processBigData = (data: ArrayBuffer): ArrayBuffer => {
-  // Process the data
-  const result = new ArrayBuffer(data.byteLength);
-  new Uint8Array(result).set(new Uint8Array(data));
-  return result;
+const processBuffer = (buf: ArrayBuffer) => {
+  const copy = new ArrayBuffer(buf.byteLength);
+  new Uint8Array(copy).set(new Uint8Array(buf));
+  return copy; // only the processed buffer is sent back
 };
 
-const bigData = new ArrayBuffer(1000000);
+const buffer = new ArrayBuffer(1_000_000);
 
-(async () => {
-  try {
-    const result = await Thread.exec(processBigData, bigData);
-    console.log('Processed data size:', result.byteLength);
-  } catch (error) {
-    console.error('Error in thread execution:', error);
-  }
-})();
+Thread.exec(processBuffer, buffer).then((result) =>
+  console.log('Processed buffer size:', result.byteLength),
+);
 ```
+
+---
 
 ## API
 
 ### `Thread`
 
-- `static configure(options: { enableCaching?: boolean }): void`: Configures the caching behavior of the library.
-- `static exec<T extends any[], R>(fn: (...args: T) => R, ...args: T): Promise<R>`: Executes the provided function in a web worker with the given arguments and returns a promise that resolves with the result.
+- `static configure(options: { enableCaching?: boolean }): void`  
+  Configures caching behavior for function executions.
+
+- `static exec<T extends any[], R>(fn: (...args: T) => R | Promise<R>, ...args: T): Promise<R>`  
+  Executes a function in a worker thread and returns a promise with the result. Supports async functions and transferable objects.
+
+---
 
 ### `ThreadPool`
 
-- `constructor(options: { size: number, enableCaching?: boolean })`: Creates a new thread pool with the specified size and optional caching.
-- `exec<T extends any[], R>(fn: (...args: T) => R, ...args: T): Promise<R>`: Executes the provided function in a web worker from the pool with the given arguments and returns a promise that resolves with the result.
+- `constructor(options: { size?: number; enableCaching?: boolean })`  
+  Creates a pool of workers. Defaults to `navigator.hardwareConcurrency` if size is not specified.
 
-## Advanced Features
+- `exec<T extends any[], R>(fn: (...args: T) => R | Promise<R>, ...args: T): Promise<R>`  
+  Executes a task in the pool, queues it if all workers are busy, and resolves with the result.
 
-### Dynamic Thread Pool Sizing
+---
 
-The thread pool automatically adjusts its size based on the available hardware concurrency. This ensures optimal performance across different devices.
+## Notes
 
-### LRU Caching
+- All code inside `Thread` or `ThreadPool` runs in **worker threads**, meaning the main thread remains responsive.
+- Supports **async functions**, so heavy computations or I/O operations like `fetch` can safely run in the worker.
+- Only **cloneable data** is returned to the main thread (objects, arrays, primitives). Functions, DOM nodes, and certain classes cannot be transferred.
 
-The library uses an LRU (Least Recently Used) caching mechanism to store results of previously executed functions. This can significantly improve performance for repeated calls with the same arguments.
-
-### Improved Type Safety
-
-The library now uses TypeScript generics for better type inference and safety when working with different function signatures.
+---
 
 ## Contributing
 
-Contributions are welcome! Please open an issue or submit a pull request for any improvements or bug fixes.
+Contributions, bug reports, and feature requests are welcome! Please open an issue or submit a pull request.
+
+---
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
+MIT License — see the [LICENSE](./LICENSE) file for details.
